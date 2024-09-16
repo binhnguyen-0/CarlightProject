@@ -1,0 +1,129 @@
+C51 COMPILER V9.60.7.0   MAIN                                                              09/16/2024 13:12:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: D:\Embedded\Vdk\KeilC\1. Mainprogram\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEX
+                    -TEND PRINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <REGX51.H>
+   2          
+   3          sbit Relay = P2^7;      // Chan kich tin hieu cho relay 24V
+   4          sbit CS = P2^0;         // Chan chon thiet bi
+   5          sbit SCK = P2^1;        // Chan xung dieu khien
+   6          sbit MISO = P2^2;       // Chan truyen du lieu toi 8051 tu ADC
+   7          sbit MOSI = P2^3;       // Chan truyen du lieu toi ADC tu 8051
+   8          
+   9          void initialize_SPI();        // Khai bao ham khoi tao SPI
+  10          unsigned char interface_SPI (unsigned char Data); // Khai bao ham truyen va nhan du lieu qua SPI
+  11          unsigned char read_ADC();                         // Khai bao ham doc gia tri cua ADC
+  12          void control_Carlight();                          // Khai bao ham dieu khien LED 24V
+  13          void delay_Time(unsigned int ms);                 // Khai bao ham delay su dung Timer 8051
+  14          
+  15          void main()
+  16          {
+  17   1          initialize_SPI();         // Khoi tao giao thuc SPI
+  18   1          while (1) {
+  19   2              control_Carlight();   // Goi ham dieu khien LED 24V
+  20   2              delay_Time(1000);     // Delay 1s
+  21   2          }
+  22   1      }
+  23          
+  24          void initialize_SPI()   // Khoi tao giao thuc SPI
+  25          {
+  26   1          CS = 1;             // Ban dau keo CS len 1 --> khong giao tiep SPI
+  27   1          MOSI = 0;           // Khong gui du lieu
+  28   1          SCK = 0;            // Chua su dung SPI
+  29   1      }
+  30          
+  31          unsigned char interface_SPI (unsigned char Data)    // Tao ham truyen va nhan du lieu SPI
+  32          {
+  33   1          unsigned int i;
+  34   1          unsigned int received_Data = 0;
+  35   1      
+  36   1          for (i = 0; i < 8; i++) {   // Gui tung bit cua 1 byte du lieu
+  37   2              if (Data & 0x80) {      // Kiem tra bit cao nhat MSB de bat dau gui tung bit mot bat dau tu MSB --> L
+             -SB
+  38   3                  MOSI = 1;  
+  39   3              } else {
+  40   3                  MOSI = 0;  
+  41   3              }
+  42   2              
+  43   2              SCK = 1;                // Tao xung de bat dau truyen
+  44   2              Data <<= 1;             // Dich 1 bit sang trai de chuan bi gui bit tiep theo
+  45   2              received_Data <<= 1;    // Dich 1 bit sang trai de chuan bi nhan bit tu ADC
+  46   2              if (MISO)               // MISO = 1 thi them bit LSB la 1
+  47   2              {           
+  48   3                  received_Data |= 0x01;
+  49   3              }
+  50   2              SCK = 0;                // Hoan thanh truyen 1 bit
+  51   2          }
+  52   1          
+  53   1          return received_Data;       // Tra ve gia tri
+C51 COMPILER V9.60.7.0   MAIN                                                              09/16/2024 13:12:30 PAGE 2   
+
+  54   1          
+  55   1      }
+  56          
+  57          unsigned char read_ADC()        // Tao ham doc gia tri tu ADC
+  58          {
+  59   1          unsigned char MSB;
+  60   1          unsigned int result;
+  61   1      
+  62   1          CS = 0;                     // Keo chan CS = 0 bat dau giao tiep
+  63   1          interface_SPI(0xD0);        // Doc du lieu tu kenh 0 cua ADC
+  64   1          MSB = interface_SPI(0x00);  // Gui gia tri trong vào ADC va bat dau nhan gia tri ADC tu kenh 0
+  65   1          CS = 1;                     // Dung giao tiep giua 8051 voi ADC
+  66   1      
+  67   1          result = MSB;               // Luu gia tri tu ADC
+  68   1        
+  69   1          return result;              // Tra ve gia tri cho ham
+  70   1      }
+  71          
+  72          void control_Carlight()     // Tao ham dieu khien den o to
+  73          {
+  74   1          unsigned int light_Value = read_ADC();  // Khoi tao gia tri anh sang = gia tri do tu ADC
+  75   1          
+  76   1          if (light_Value < 110)  // Neu gia tri anh sang nho hon 110 thi bat den, lon hon thi tat den
+  77   1          {   
+  78   2              Relay = 1;
+  79   2          } 
+  80   1          
+  81   1          else 
+  82   1            
+  83   1          {  
+  84   2              Relay = 0;  
+  85   2          }
+  86   1      }
+  87          
+  88          void delay_Time(unsigned int ms)  // Khoi tao ham delay su dung bo Timer/Counter 8051
+  89          {
+  90   1          unsigned int i;
+  91   1        
+  92   1          for (i = 0; i < ms; i++) 
+  93   1          {
+  94   2              TMOD = 0x01;          // Chon Timer 0, su dung thanh ghi TMOD - chon che do Mode 1: 16 bit
+  95   2              TH0 = 0xFC;           // TL0 dem tu 0x67 --> 0xFC va tran ve 0x67
+  96   2              TL0 = 0x67;   
+  97   2              TR0 = 1;              // Timer0 bat dau dem
+  98   2              while (TF0 == 0);     // Kiem tra xem Timer0 da dem xong hay chua
+  99   2              TR0 = 0;              // Dung dem tai Timer0
+ 100   2              TF0 = 0;              // Dat co tran TF ve 0 --> chuan bi dem tiep  
+ 101   2          }
+ 102   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    141    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
